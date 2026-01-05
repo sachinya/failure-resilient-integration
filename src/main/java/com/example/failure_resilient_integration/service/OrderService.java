@@ -32,7 +32,8 @@ public class OrderService {
                 })
                 .orElseGet(() -> {
 
-                    paymentClient.charge(request.getOrderId(), request.getAmount());
+                    // paymentClient.charge(request.getOrderId(), request.getAmount());
+                    chargeWithRetry(request.getOrderId(), request.getAmount());
                     fulfillmentClient.fulfill(request.getOrderId());
 
                     OrderResponse response = new OrderResponse(
@@ -48,4 +49,30 @@ public class OrderService {
                     return response;
                 });
     }
+
+    private void chargeWithRetry(String orderId, Integer amount) {
+
+        int maxAttempts = 3;
+        int attempt = 0;
+
+        while (true) {
+            try {
+                attempt++;
+                paymentClient.charge(orderId, amount);
+                return; // success
+            } catch (RuntimeException ex) {
+                System.out.println("Payment failed for order " + orderId + " but retrying with retry count " + attempt);
+                if (attempt >= maxAttempts) {
+                    throw ex; // give up
+                }
+
+                // simple backoff
+                try {
+                    Thread.sleep(200L * attempt);
+                } catch (InterruptedException ignored) {
+                }
+            }
+        }
+    }
+
 }
