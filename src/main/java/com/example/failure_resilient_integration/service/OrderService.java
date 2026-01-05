@@ -34,11 +34,23 @@ public class OrderService {
 
                     // paymentClient.charge(request.getOrderId(), request.getAmount());
                     chargeWithRetry(request.getOrderId(), request.getAmount());
-                    fulfillmentClient.fulfill(request.getOrderId());
 
-                    OrderResponse response = new OrderResponse(
-                            request.getOrderId(),
-                            OrderStatus.CONFIRMED);
+                    OrderResponse response;
+                    try {
+                        // Fulfillment (NOT retryable here)
+                        fulfillmentClient.fulfill(request.getOrderId());
+
+                        response = new OrderResponse(
+                                request.getOrderId(),
+                                OrderStatus.CONFIRMED);
+
+                    } catch (RuntimeException ex) {
+
+                        // Partial failure captured
+                        response = new OrderResponse(
+                                request.getOrderId(),
+                                OrderStatus.PAYMENT_SUCCESS_PENDING_FULFILLMENT);
+                    }
 
                     idempotencyRepository.save(
                             new IdempotencyRecord(
